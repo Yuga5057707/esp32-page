@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Моніторинг 3 фаз (ESP32 + Firebase)</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    .phase {
+      background: white;
+      border-radius: 12px;
+      padding: 15px;
+      margin: 10px auto;
+      max-width: 400px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    }
+    .value {
+      font-size: 1.5em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Дані з ESP32 (3 фази)</h1>
+
+  <div class="phase" id="phaseA">
+    <h2>Фаза A</h2>
+    <p>Струм: <span class="value" id="currentA">---</span> A</p>
+    <p>Напруга: <span class="value" id="voltageA">---</span> V</p>
+  </div>
+
+  <div class="phase" id="phaseB">
+    <h2>Фаза B</h2>
+    <p>Струм: <span class="value" id="currentB">---</span> A</p>
+    <p>Напруга: <span class="value" id="voltageB">---</span> V</p>
+  </div>
+
+  <div class="phase" id="phaseC">
+    <h2>Фаза C</h2>
+    <p>Струм: <span class="value" id="currentC">---</span> A</p>
+    <p>Напруга: <span class="value" id="voltageC">---</span> V</p>
+  </div>
+
+  <script>
+    // 🔧 Firebase конфігурація з Web App (див. Firebase Console)
+    const firebaseConfig = {
+      apiKey: "AIzaSyDrXS4huWGNxljHaFF7zQ9oZTEein2N3xI",
+      authDomain: "esp32to3phase.firebaseapp.com",
+      databaseURL: "https://esp32to3phase-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "esp32to3phase",
+      storageBucket: "esp32to3phase.appspot.com",
+      messagingSenderId: "454353829105",
+      appId: "1:454353829105:web:2a468e18e8a1d114a9fd50"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function updateValue(path, elementId) {
+      db.ref(path).on("value", snapshot => {
+        document.getElementById(elementId).textContent = snapshot.val().toFixed(2);
+      });
+    }
+
+    // Підключення до всіх точок
+    updateValue("/phaseA/current", "currentA");
+    updateValue("/phaseA/voltage", "voltageA");
+    updateValue("/phaseB/current", "currentB");
+    updateValue("/phaseB/voltage", "voltageB");
+    updateValue("/phaseC/current", "currentC");
+    updateValue("/phaseC/voltage", "voltageC");
+  </script>
+</body>
+</html>
