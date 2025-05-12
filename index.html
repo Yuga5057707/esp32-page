@@ -1,122 +1,161 @@
 <!DOCTYPE html>
-<html>
+<html lang="uk">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ДАЧА Монітор навантаження</title>
+  <title>ESP32 3-Фазний Монітор</title>
+
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     body {
+      background-color: #121212;
+      color: #e0e0e0;
       font-family: Arial, sans-serif;
-      text-align: center;
       margin: 20px;
+      text-align: center;
     }
-    #espStatus {
-      font-weight: bold;
+    h1 {
+      margin-bottom: 10px;
     }
-    #phases {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .phase-box {
-      border: 1px solid #ccc;
+    canvas {
+      background-color: #1e1e1e;
+      border: 1px solid #333;
+      margin: 15px auto;
+      padding: 10px;
       border-radius: 10px;
-      padding: 20px;
-      margin: 10px;
-      width: 220px;
-      box-sizing: border-box;
     }
-    h2 {
-      margin-bottom: 5px;
+    #status {
+      font-weight: bold;
+      color: lime;
     }
     #lastUpdated {
-      margin-top: 10px;
+      color: #aaa;
       font-size: 0.9em;
-      color: #666;
+      margin-bottom: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>ДАЧА 3-Фазний Монітор</h1>
-  <div>
-    Статус пристрою: <span id="espStatus" style="color:gray;">перевірка...</span>
-  </div>
-  <div id="lastUpdated">Останнє оновлення: очікування...</div>
+  <h1>ESP32 3-Фазний Монітор</h1>
+  <div>Статус: <span id="status">перевірка...</span></div>
+  <div id="lastUpdated">Останнє оновлення: —</div>
 
-  <div id="phases">
-    <div class="phase-box">
-      <h2>Фаза A</h2>
-      Струм: <span id="currentA">...</span> A<br/>
-      Напруга: <span id="voltageA">...</span> V
-    </div>
-    <div class="phase-box">
-      <h2>Фаза B</h2>
-      Струм: <span id="currentB">...</span> A<br/>
-      Напруга: <span id="voltageB">...</span> V
-    </div>
-    <div class="phase-box">
-      <h2>Фаза C</h2>
-      Струм: <span id="currentC">...</span> A<br/>
-      Напруга: <span id="voltageC">...</span> V
-    </div>
-  </div>
+  <!-- Графіки -->
+  <canvas id="chartCurrent" width="350" height="200"></canvas>
+  <canvas id="chartVoltage" width="350" height="200"></canvas>
 
   <script>
+    // Firebase конфігурація
     const firebaseConfig = {
       apiKey: "AIzaSyDrXS4huWGNxljHaFF7zQ9oZTEein2N3xI",
       databaseURL: "https://esp32to3phase-default-rtdb.europe-west1.firebasedatabase.app"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    function showOfflineData() {
-      ["currentA", "voltageA", "currentB", "voltageB", "currentC", "voltageC"].forEach(id => {
-        document.getElementById(id).innerText = "...";
-      });
-      document.getElementById("lastUpdated").innerText = "Останнє оновлення: ESP32 офлайн";
-    }
+    const statusEl = document.getElementById("status");
+    const lastUpdatedEl = document.getElementById("lastUpdated");
 
-    function updateTimestamp() {
+    // Час останнього оновлення
+    function setUpdatedTime() {
       const now = new Date();
-      document.getElementById("lastUpdated").innerText =
-        "Останнє оновлення: " + now.toLocaleString("uk-UA");
+      lastUpdatedEl.innerText = "Останнє оновлення: " + now.toLocaleString("uk-UA");
     }
 
-    function enableRealtimeUpdates() {
-      const paths = [
-        { path: "/phaseA/current", id: "currentA" },
-        { path: "/phaseA/voltage", id: "voltageA" },
-        { path: "/phaseB/current", id: "currentB" },
-        { path: "/phaseB/voltage", id: "voltageB" },
-        { path: "/phaseC/current", id: "currentC" },
-        { path: "/phaseC/voltage", id: "voltageC" }
-      ];
-
-      paths.forEach(({ path, id }) => {
-        db.ref(path).on("value", snap => {
-          const val = snap.val();
-          document.getElementById(id).innerText = val !== null ? val.toFixed(2) : "...";
-          updateTimestamp();
-        });
-      });
-    }
-
-    db.ref("/status/online").on("value", snapshot => {
-      const online = snapshot.val();
-      const statusEl = document.getElementById("espStatus");
-
-      if (online) {
+    // Слухаємо статус ESP32
+    db.ref("/status/online").on("value", snap => {
+      if (snap.val()) {
         statusEl.innerText = "Підключено";
-        statusEl.style.color = "green";
-        enableRealtimeUpdates();
+        statusEl.style.color = "lime";
       } else {
         statusEl.innerText = "Офлайн";
         statusEl.style.color = "red";
-        showOfflineData();
       }
+    });
+
+    // Підготувати графіки
+    const ctxCurrent = document.getElementById('chartCurrent').getContext('2d');
+    const ctxVoltage = document.getElementById('chartVoltage').getContext('2d');
+
+    const chartCurrent = new Chart(ctxCurrent, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'Фаза A', data: [], borderColor: 'red', fill: false },
+          { label: 'Фаза B', data: [], borderColor: 'orange', fill: false },
+          { label: 'Фаза C', data: [], borderColor: 'yellow', fill: false }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: 'white' } } },
+        scales: {
+          x: { ticks: { color: 'white' } },
+          y: { ticks: { color: 'white' } }
+        }
+      }
+    });
+
+    const chartVoltage = new Chart(ctxVoltage, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'Фаза A', data: [], borderColor: 'cyan', fill: false },
+          { label: 'Фаза B', data: [], borderColor: 'lime', fill: false },
+          { label: 'Фаза C', data: [], borderColor: 'magenta', fill: false }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: 'white' } } },
+        scales: {
+          x: { ticks: { color: 'white' } },
+          y: { ticks: { color: 'white' } }
+        }
+      }
+    });
+
+    // Завантажити історію (останніх 10 записів)
+    db.ref("/history").limitToLast(10).on("value", (snap) => {
+      const data = snap.val();
+      if (!data) return;
+
+      const labels = [];
+      const currentA = [], currentB = [], currentC = [];
+      const voltageA = [], voltageB = [], voltageC = [];
+
+      Object.values(data).forEach(entry => {
+        const t = new Date(entry.ts * 1000).toLocaleTimeString("uk-UA", {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+        labels.push(t);
+        currentA.push(entry.phaseA?.current || null);
+        currentB.push(entry.phaseB?.current || null);
+        currentC.push(entry.phaseC?.current || null);
+        voltageA.push(entry.phaseA?.voltage || null);
+        voltageB.push(entry.phaseB?.voltage || null);
+        voltageC.push(entry.phaseC?.voltage || null);
+      });
+
+      chartCurrent.data.labels = labels;
+      chartCurrent.data.datasets[0].data = currentA;
+      chartCurrent.data.datasets[1].data = currentB;
+      chartCurrent.data.datasets[2].data = currentC;
+      chartCurrent.update();
+
+      chartVoltage.data.labels = labels;
+      chartVoltage.data.datasets[0].data = voltageA;
+      chartVoltage.data.datasets[1].data = voltageB;
+      chartVoltage.data.datasets[2].data = voltageC;
+      chartVoltage.update();
+
+      setUpdatedTime();
     });
   </script>
 </body>
