@@ -1,81 +1,123 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Моніторинг 3 фаз (ESP32 + Firebase)</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESP32 Монітор</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <style>
     body {
-      font-family: sans-serif;
-      background: #f4f4f4;
-      padding: 20px;
-    }
-    h1 {
+      font-family: Arial, sans-serif;
       text-align: center;
+      margin: 20px;
     }
-    .phase {
-      background: white;
-      border-radius: 12px;
-      padding: 15px;
-      margin: 10px auto;
-      max-width: 400px;
-      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    #espStatus {
+      font-weight: bold;
     }
-    .value {
-      font-size: 1.5em;
+    #phases {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .phase-box {
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 20px;
+      margin: 10px;
+      width: 220px;
+      box-sizing: border-box;
+    }
+    h2 {
+      margin-bottom: 5px;
+    }
+    #lastUpdated {
+      margin-top: 10px;
+      font-size: 0.9em;
+      color: #666;
     }
   </style>
 </head>
 <body>
-  <h1>Дані з ESP32 (3 фази)</h1>
-
-  <div class="phase" id="phaseA">
-    <h2>Фаза A</h2>
-    <p>Струм: <span class="value" id="currentA">---</span> A</p>
-    <p>Напруга: <span class="value" id="voltageA">---</span> V</p>
+  <h1>ESP32 3-Фазний Монітор</h1>
+  <div>
+    Статус пристрою: <span id="espStatus" style="color:gray;">перевірка...</span>
   </div>
+  <div id="lastUpdated">Останнє оновлення: очікування...</div>
 
-  <div class="phase" id="phaseB">
-    <h2>Фаза B</h2>
-    <p>Струм: <span class="value" id="currentB">---</span> A</p>
-    <p>Напруга: <span class="value" id="voltageB">---</span> V</p>
-  </div>
-
-  <div class="phase" id="phaseC">
-    <h2>Фаза C</h2>
-    <p>Струм: <span class="value" id="currentC">---</span> A</p>
-    <p>Напруга: <span class="value" id="voltageC">---</span> V</p>
+  <div id="phases">
+    <div class="phase-box">
+      <h2>Фаза A</h2>
+      Струм: <span id="currentA">...</span> A<br/>
+      Напруга: <span id="voltageA">...</span> V
+    </div>
+    <div class="phase-box">
+      <h2>Фаза B</h2>
+      Струм: <span id="currentB">...</span> A<br/>
+      Напруга: <span id="voltageB">...</span> V
+    </div>
+    <div class="phase-box">
+      <h2>Фаза C</h2>
+      Струм: <span id="currentC">...</span> A<br/>
+      Напруга: <span id="voltageC">...</span> V
+    </div>
   </div>
 
   <script>
-    // 🔧 Firebase конфігурація з Web App (див. Firebase Console)
     const firebaseConfig = {
       apiKey: "AIzaSyDrXS4huWGNxljHaFF7zQ9oZTEein2N3xI",
-      authDomain: "esp32to3phase.firebaseapp.com",
-      databaseURL: "https://esp32to3phase-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "esp32to3phase",
-      storageBucket: "esp32to3phase.appspot.com",
-      messagingSenderId: "454353829105",
-      appId: "1:454353829105:web:2a468e18e8a1d114a9fd50"
+      databaseURL: "https://esp32to3phase-default-rtdb.europe-west1.firebasedatabase.app"
     };
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    function updateValue(path, elementId) {
-      db.ref(path).on("value", snapshot => {
-        document.getElementById(elementId).textContent = snapshot.val().toFixed(2);
+    function showOfflineData() {
+      ["currentA", "voltageA", "currentB", "voltageB", "currentC", "voltageC"].forEach(id => {
+        document.getElementById(id).innerText = "...";
+      });
+      document.getElementById("lastUpdated").innerText = "Останнє оновлення: ESP32 офлайн";
+    }
+
+    function updateTimestamp() {
+      const now = new Date();
+      document.getElementById("lastUpdated").innerText =
+        "Останнє оновлення: " + now.toLocaleString("uk-UA");
+    }
+
+    function enableRealtimeUpdates() {
+      const paths = [
+        { path: "/phaseA/current", id: "currentA" },
+        { path: "/phaseA/voltage", id: "voltageA" },
+        { path: "/phaseB/current", id: "currentB" },
+        { path: "/phaseB/voltage", id: "voltageB" },
+        { path: "/phaseC/current", id: "currentC" },
+        { path: "/phaseC/voltage", id: "voltageC" }
+      ];
+
+      paths.forEach(({ path, id }) => {
+        db.ref(path).on("value", snap => {
+          const val = snap.val();
+          document.getElementById(id).innerText = val !== null ? val.toFixed(2) : "...";
+          updateTimestamp();
+        });
       });
     }
 
-    // Підключення до всіх точок
-    updateValue("/phaseA/current", "currentA");
-    updateValue("/phaseA/voltage", "voltageA");
-    updateValue("/phaseB/current", "currentB");
-    updateValue("/phaseB/voltage", "voltageB");
-    updateValue("/phaseC/current", "currentC");
-    updateValue("/phaseC/voltage", "voltageC");
+    db.ref("/status/online").on("value", snapshot => {
+      const online = snapshot.val();
+      const statusEl = document.getElementById("espStatus");
+
+      if (online) {
+        statusEl.innerText = "Підключено";
+        statusEl.style.color = "green";
+        enableRealtimeUpdates();
+      } else {
+        statusEl.innerText = "Офлайн";
+        statusEl.style.color = "red";
+        showOfflineData();
+      }
+    });
   </script>
 </body>
 </html>
