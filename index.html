@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ДАЧА 3-Фазний Монітор</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -85,17 +85,17 @@
   <div id="liveValues">
     <div class="phase-box">
       <h3>Фаза A</h3>
-      Струм: <span id="currentA">...</span> A<br>
+      Струм: <span id="currentA">...</span> A<br />
       Напруга: <span id="voltageA">...</span> V
     </div>
     <div class="phase-box">
       <h3>Фаза B</h3>
-      Струм: <span id="currentB">...</span> A<br>
+      Струм: <span id="currentB">...</span> A<br />
       Напруга: <span id="voltageB">...</span> V
     </div>
     <div class="phase-box">
       <h3>Фаза C</h3>
-      Струм: <span id="currentC">...</span> A<br>
+      Струм: <span id="currentC">...</span> A<br />
       Напруга: <span id="voltageC">...</span> V
     </div>
     <div class="phase-box">
@@ -139,20 +139,11 @@
     const ctxCurrent = document.getElementById("currentChart").getContext("2d");
     const ctxVoltage = document.getElementById("voltageChart").getContext("2d");
     let chartCurrent, chartVoltage;
-    let lastDataTimestamp = 0;
     let currentRange = localStorage.getItem("selectedRange") || 1;
 
-    setInterval(() => {
-      const now = Date.now() / 1000;
-      const offline = (now - lastDataTimestamp > 300);
-      statusEl.innerText = offline ? "ESP32 офлайн" : "Підключено";
-      statusEl.style.color = offline ? "red" : "lime";
-      if (offline) {
-        Object.values(currentEls).forEach(el => el.innerText = "...");
-      }
-    }, 60000);
-
-    setInterval(() => reloadCharts(), 10 * 60 * 1000); // автооновлення графіків кожні 10 хвилин
+    function setValuesDots() {
+      Object.values(currentEls).forEach(el => el.innerText = "...");
+    }
 
     function updateLiveData() {
       ["phaseA", "phaseB", "phaseC"].forEach(phase => {
@@ -162,7 +153,6 @@
             currentEls[`${type}${phase.charAt(5)}`].innerText = val ? val.toFixed(1) : "...";
             updatePower();
             lastUpdatedEl.innerText = "Останнє оновлення: " + new Date().toLocaleString("uk-UA");
-            lastDataTimestamp = Date.now() / 1000;
           });
         });
       });
@@ -177,6 +167,30 @@
       const vc = parseFloat(currentEls.voltageC.innerText) || 0;
       const power = ia * va + ib * vb + ic * vc;
       currentEls.power.innerText = power.toFixed(0);
+    }
+
+    function checkStatus() {
+      statusEl.innerText = "Перевірка підключення...";
+      statusEl.style.color = "orange";
+      setValuesDots();
+
+      db.ref("/status/lastSeen").get().then(snap => {
+        const lastSeen = snap.val();
+        const now = Math.floor(Date.now() / 1000);
+        if (!lastSeen || now - lastSeen > 90) {
+          statusEl.innerText = "ESP32 офлайн";
+          statusEl.style.color = "red";
+          setValuesDots();
+        } else {
+          statusEl.innerText = "Підключено";
+          statusEl.style.color = "lime";
+          updateLiveData();
+        }
+      }).catch(() => {
+        statusEl.innerText = "Помилка з'єднання";
+        statusEl.style.color = "red";
+        setValuesDots();
+      });
     }
 
     function setRange(hours) {
@@ -198,7 +212,7 @@
         const labels = [], iA = [], iB = [], iC = [], vA = [], vB = [], vC = [];
 
         Object.values(data).forEach(entry => {
-          const t = new Date(entry.ts * 1000).toLocaleTimeString("uk-UA", {hour: '2-digit', minute: '2-digit'});
+          const t = new Date(entry.ts * 1000).toLocaleTimeString("uk-UA", { hour: '2-digit', minute: '2-digit' });
           labels.push(t);
           iA.push(entry.phaseA?.current || null);
           iB.push(entry.phaseB?.current || null);
@@ -253,8 +267,9 @@
       });
     }
 
-    updateLiveData();
-    loadChartData(currentRange);
+    checkStatus();
+    reloadCharts();
+    setInterval(reloadCharts, 60000); // оновлення графіків щохвилини
   </script>
 </body>
 </html>
