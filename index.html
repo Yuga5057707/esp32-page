@@ -45,7 +45,8 @@
     }
     canvas {
       display: block;
-      width: 100%;
+      width: 100% !important;
+      height: auto !important;
       max-height: 300px;
       margin: 20px auto;
       background: #1e1e1e;
@@ -55,6 +56,7 @@
     #controls {
       text-align: center;
       margin: 10px 0 20px 0;
+      flex-wrap: wrap;
     }
     .range-btn {
       background-color: #333;
@@ -67,6 +69,11 @@
     }
     .range-btn:hover {
       background-color: #555;
+    }
+    @media (orientation: landscape) and (max-width: 768px) {
+      canvas {
+        max-height: 240px;
+      }
     }
   </style>
 </head>
@@ -98,11 +105,12 @@
   </div>
 
   <div id="controls">
-    <button class="range-btn" onclick="loadChartData(1)">1 година</button>
-    <button class="range-btn" onclick="loadChartData(2)">2 години</button>
-    <button class="range-btn" onclick="loadChartData(6)">6 годин</button>
-    <button class="range-btn" onclick="loadChartData(12)">12 годин</button>
-    <button class="range-btn" onclick="loadChartData(24)">24 години</button>
+    <button class="range-btn" onclick="setRange(1)">1 година</button>
+    <button class="range-btn" onclick="setRange(2)">2 години</button>
+    <button class="range-btn" onclick="setRange(6)">6 годин</button>
+    <button class="range-btn" onclick="setRange(12)">12 годин</button>
+    <button class="range-btn" onclick="setRange(24)">24 години</button>
+    <button class="range-btn" onclick="reloadCharts()">Оновити графік</button>
   </div>
 
   <canvas id="currentChart"></canvas>
@@ -128,19 +136,23 @@
 
     const statusEl = document.getElementById("status");
     const lastUpdatedEl = document.getElementById("lastUpdated");
-
     const ctxCurrent = document.getElementById("currentChart").getContext("2d");
     const ctxVoltage = document.getElementById("voltageChart").getContext("2d");
     let chartCurrent, chartVoltage;
-
     let lastDataTimestamp = 0;
+    let currentRange = localStorage.getItem("selectedRange") || 1;
+
     setInterval(() => {
       const now = Date.now() / 1000;
-      if (now - lastDataTimestamp > 300) {
-        statusEl.innerText = "ESP32 офлайн";
-        statusEl.style.color = "red";
+      const offline = (now - lastDataTimestamp > 300);
+      statusEl.innerText = offline ? "ESP32 офлайн" : "Підключено";
+      statusEl.style.color = offline ? "red" : "lime";
+      if (offline) {
+        Object.values(currentEls).forEach(el => el.innerText = "...");
       }
     }, 60000);
+
+    setInterval(() => reloadCharts(), 10 * 60 * 1000); // автооновлення графіків кожні 10 хвилин
 
     function updateLiveData() {
       ["phaseA", "phaseB", "phaseC"].forEach(phase => {
@@ -165,6 +177,16 @@
       const vc = parseFloat(currentEls.voltageC.innerText) || 0;
       const power = ia * va + ib * vb + ic * vc;
       currentEls.power.innerText = power.toFixed(0);
+    }
+
+    function setRange(hours) {
+      localStorage.setItem("selectedRange", hours);
+      currentRange = hours;
+      loadChartData(currentRange);
+    }
+
+    function reloadCharts() {
+      loadChartData(currentRange);
     }
 
     function loadChartData(hours) {
@@ -232,7 +254,7 @@
     }
 
     updateLiveData();
-    loadChartData(1);
+    loadChartData(currentRange);
   </script>
 </body>
 </html>
