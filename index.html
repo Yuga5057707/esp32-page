@@ -1,8 +1,9 @@
+
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ДАЧА 3-Фазний Монітор</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -15,65 +16,38 @@
       margin: 0;
       padding: 20px;
     }
-    h1 {
-      text-align: center;
-      margin-bottom: 10px;
-    }
+    h1 { text-align: center; margin-bottom: 10px; }
     #status {
-      font-weight: bold;
-      text-align: center;
-      margin-bottom: 5px;
+      font-weight: bold; text-align: center; margin-bottom: 5px;
     }
     #lastUpdated {
-      text-align: center;
-      font-size: 0.9em;
-      color: #aaa;
-      margin-bottom: 20px;
+      text-align: center; font-size: 0.9em; color: #aaa; margin-bottom: 20px;
     }
     #liveValues {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 20px;
+      display: flex; justify-content: center; flex-wrap: wrap; gap: 20px;
     }
     .phase-box {
-      border: 1px solid #444;
-      border-radius: 10px;
-      padding: 15px;
-      width: 200px;
-      background-color: #1e1e1e;
+      border: 1px solid #444; border-radius: 10px; padding: 15px;
+      width: 200px; background-color: #1e1e1e;
+    }
+    .minmax-box {
+      border: 1px dashed #555; border-radius: 10px;
+      padding: 10px; margin: 10px auto; width: 95%; max-width: 800px;
+      font-size: 0.85em; background-color: #1c1c1c;
     }
     canvas {
-      display: block;
-      width: 100% !important;
-      height: auto !important;
-      max-height: 300px;
-      margin: 20px auto;
-      background: #1e1e1e;
-      border-radius: 10px;
-      padding: 10px;
+      display: block; width: 100% !important; height: auto !important;
+      max-height: 280px; margin: 20px auto; background: #1e1e1e;
+      border-radius: 10px; padding: 10px;
     }
-    #controls {
-      text-align: center;
-      margin: 10px 0 20px 0;
-      flex-wrap: wrap;
-    }
+    #controls { text-align: center; margin: 10px 0 20px 0; }
     .range-btn {
-      background-color: #333;
-      color: white;
-      border: none;
-      padding: 8px 12px;
-      margin: 4px;
-      border-radius: 5px;
-      cursor: pointer;
+      background-color: #333; color: white; border: none;
+      padding: 8px 12px; margin: 4px; border-radius: 5px; cursor: pointer;
     }
-    .range-btn:hover {
-      background-color: #555;
-    }
-    @media (orientation: landscape) and (max-width: 768px) {
-      canvas {
-        max-height: 240px;
-      }
+    .range-btn:hover { background-color: #555; }
+    footer {
+      text-align: center; font-size: 0.8em; color: #888; margin-top: 40px;
     }
   </style>
 </head>
@@ -81,29 +55,21 @@
   <h1>ДАЧА 3-Фазний Монітор</h1>
   <div id="status">Перевірка підключення...</div>
   <div id="lastUpdated">Останнє оновлення: —</div>
-
   <div id="liveValues">
-    <div class="phase-box">
-      <h3>Фаза A</h3>
-      Струм: <span id="currentA">...</span> A<br>
-      Напруга: <span id="voltageA">...</span> V
-    </div>
-    <div class="phase-box">
-      <h3>Фаза B</h3>
-      Струм: <span id="currentB">...</span> A<br>
-      Напруга: <span id="voltageB">...</span> V
-    </div>
-    <div class="phase-box">
-      <h3>Фаза C</h3>
-      Струм: <span id="currentC">...</span> A<br>
-      Напруга: <span id="voltageC">...</span> V
-    </div>
-    <div class="phase-box">
-      <h3>Потужність</h3>
-      Сумарна: <span id="power">...</span> Вт
-    </div>
+    <div class="phase-box"><h3>Фаза A</h3>Струм: <span id="currentA">...</span> A<br />Напруга: <span id="voltageA">...</span> V</div>
+    <div class="phase-box"><h3>Фаза B</h3>Струм: <span id="currentB">...</span> A<br />Напруга: <span id="voltageB">...</span> V</div>
+    <div class="phase-box"><h3>Фаза C</h3>Струм: <span id="currentC">...</span> A<br />Напруга: <span id="voltageC">...</span> V</div>
+    <div class="phase-box"><h3>Потужність</h3>Сумарна: <span id="power">...</span> Вт</div>
   </div>
-
+  <div class="minmax-box">
+    📊 <b>Поточний діапазон:</b> <span id="dataCount">-</span> точок<br><br>
+    <b>За 1 годину:</b><br />
+    Струм: Макс: <span id="iMax1h">-</span> / Мін: <span id="iMin1h">-</span> / Середнє: <span id="iAvg1h">-</span> A<br />
+    Напруга: Макс: <span id="vMax1h">-</span> / Мін: <span id="vMin1h">-</span> / Середнє: <span id="vAvg1h">-</span> V<br /><br />
+    <b>За добу:</b><br />
+    Струм: Макс: <span id="iMax24h">-</span> / Мін: <span id="iMin24h">-</span> / Середнє: <span id="iAvg24h">-</span> A<br />
+    Напруга: Макс: <span id="vMax24h">-</span> / Мін: <span id="vMin24h">-</span> / Середнє: <span id="vAvg24h">-</span> V
+  </div>
   <div id="controls">
     <button class="range-btn" onclick="setRange(1)">1 година</button>
     <button class="range-btn" onclick="setRange(2)">2 години</button>
@@ -112,158 +78,15 @@
     <button class="range-btn" onclick="setRange(24)">24 години</button>
     <button class="range-btn" onclick="reloadCharts()">Оновити графік</button>
   </div>
-
   <canvas id="currentChart"></canvas>
   <canvas id="voltageChart"></canvas>
-
+  <footer>© <span id="curDate"></span> Розроблено та впроваджено електротехнічною службою А3211</footer>
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyDrXS4huWGNxljHaFF7zQ9oZTEein2N3xI",
-      databaseURL: "https://esp32to3phase-default-rtdb.europe-west1.firebasedatabase.app"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    const currentEls = {
-      currentA: document.getElementById("currentA"),
-      voltageA: document.getElementById("voltageA"),
-      currentB: document.getElementById("currentB"),
-      voltageB: document.getElementById("voltageB"),
-      currentC: document.getElementById("currentC"),
-      voltageC: document.getElementById("voltageC"),
-      power: document.getElementById("power")
-    };
-
-    const statusEl = document.getElementById("status");
-    const lastUpdatedEl = document.getElementById("lastUpdated");
-    const ctxCurrent = document.getElementById("currentChart").getContext("2d");
-    const ctxVoltage = document.getElementById("voltageChart").getContext("2d");
-    let chartCurrent, chartVoltage;
-    let lastDataTimestamp = 0;
-    let currentRange = localStorage.getItem("selectedRange") || 1;
-
-    function setValuesDots() {
-      Object.values(currentEls).forEach(el => el.innerText = "...");
-    }
-
-    setValuesDots();
-
-    setInterval(() => {
-      const now = Date.now() / 1000;
-      const offline = (now - lastDataTimestamp > 300);
-      if (lastDataTimestamp === 0 || offline) {
-        statusEl.innerText = lastDataTimestamp === 0 ? "Перевірка підключення..." : "ESP32 офлайн";
-        statusEl.style.color = lastDataTimestamp === 0 ? "orange" : "red";
-        setValuesDots();
-      } else {
-        statusEl.innerText = "Підключено";
-        statusEl.style.color = "lime";
-      }
-    }, 60000);
-
-    setInterval(() => reloadCharts(), 60000); // автооновлення графіків щохвилини
-
-    function updateLiveData() {
-      ["phaseA", "phaseB", "phaseC"].forEach(phase => {
-        ["current", "voltage"].forEach(type => {
-          db.ref(`/${phase}/${type}`).on("value", snap => {
-            const val = snap.val();
-            currentEls[`${type}${phase.charAt(5)}`].innerText = val ? val.toFixed(1) : "...";
-            updatePower();
-            lastUpdatedEl.innerText = "Останнє оновлення: " + new Date().toLocaleString("uk-UA");
-            lastDataTimestamp = Date.now() / 1000;
-          });
-        });
-      });
-    }
-
-    function updatePower() {
-      const ia = parseFloat(currentEls.currentA.innerText) || 0;
-      const ib = parseFloat(currentEls.currentB.innerText) || 0;
-      const ic = parseFloat(currentEls.currentC.innerText) || 0;
-      const va = parseFloat(currentEls.voltageA.innerText) || 0;
-      const vb = parseFloat(currentEls.voltageB.innerText) || 0;
-      const vc = parseFloat(currentEls.voltageC.innerText) || 0;
-      const power = ia * va + ib * vb + ic * vc;
-      currentEls.power.innerText = power.toFixed(0);
-    }
-
-    function setRange(hours) {
-      localStorage.setItem("selectedRange", hours);
-      currentRange = hours;
-      loadChartData(currentRange);
-    }
-
-    function reloadCharts() {
-      loadChartData(currentRange);
-    }
-
-    function loadChartData(hours) {
-      const since = Math.floor(Date.now() / 1000) - hours * 3600;
-      db.ref("/history").orderByChild("ts").startAt(since).once("value", snap => {
-        const data = snap.val();
-        if (!data) return;
-
-        const labels = [], iA = [], iB = [], iC = [], vA = [], vB = [], vC = [];
-
-        Object.values(data).forEach(entry => {
-          const t = new Date(entry.ts * 1000).toLocaleTimeString("uk-UA", {hour: '2-digit', minute: '2-digit'});
-          labels.push(t);
-          iA.push(entry.phaseA?.current || null);
-          iB.push(entry.phaseB?.current || null);
-          iC.push(entry.phaseC?.current || null);
-          vA.push(entry.phaseA?.voltage || null);
-          vB.push(entry.phaseB?.voltage || null);
-          vC.push(entry.phaseC?.voltage || null);
-        });
-
-        if (chartCurrent) chartCurrent.destroy();
-        if (chartVoltage) chartVoltage.destroy();
-
-        chartCurrent = new Chart(ctxCurrent, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [
-              { label: "Фаза A (A)", data: iA, borderColor: "red", tension: 0.4 },
-              { label: "Фаза B (A)", data: iB, borderColor: "orange", tension: 0.4 },
-              { label: "Фаза C (A)", data: iC, borderColor: "yellow", tension: 0.4 }
-            ]
-          },
-          options: {
-            responsive: true,
-            plugins: { legend: { labels: { color: "white" } } },
-            scales: {
-              x: { ticks: { color: "white" } },
-              y: { ticks: { color: "white" } }
-            }
-          }
-        });
-
-        chartVoltage = new Chart(ctxVoltage, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [
-              { label: "Фаза A (V)", data: vA, borderColor: "lightblue", tension: 0.4 },
-              { label: "Фаза B (V)", data: vB, borderColor: "cyan", tension: 0.4 },
-              { label: "Фаза C (V)", data: vC, borderColor: "lime", tension: 0.4 }
-            ]
-          },
-          options: {
-            responsive: true,
-            plugins: { legend: { labels: { color: "white" } } },
-            scales: {
-              x: { ticks: { color: "white" } },
-              y: { ticks: { color: "white" } }
-            }
-          }
-        });
-      });
-    }
-
-    updateLiveData();
-    loadChartData(currentRange);
+    document.getElementById("curDate").innerText = new Date().getFullYear();
   </script>
+
+<script>
+<ПОВНИЙ ВМІСТ dashboard.js буде вставлено тут, див. попереднє повідомлення>
+</script>
 </body>
 </html>
