@@ -121,17 +121,34 @@
       Object.values(currentEls).forEach(el=>el.innerText="...");
       lastUpdatedEl.innerText="Останнє оновлення: —";
     }
-    function updateLiveData(){
-      ["phaseA","phaseB","phaseC"].forEach((phase,i)=>{
-        ["current","voltage"].forEach(type=>{
-          db.ref(`/${phase}/${type}`).on("value",snap=>{
-            const v=snap.val();
-            currentEls[`${type}${phase.charAt(5)}`].innerText=v?.toFixed(1)||"...";
-            updatePower(); lastUpdatedEl.innerText="Останнє оновлення: "+new Date().toLocaleString("uk-UA");
-          });
-        });
-      });
-    }
+/**
+ * Підписуємося на нові записи у /history,
+ * беремо тільки останній (limitToLast(1))
+ * і оновлюємо поточні покази.
+ */
+function updateLiveData() {
+  // Потрібно підписатися once на limitToLast(1), але щоб працювало live —
+  // використаємо on('child_added') на запиті з limitToLast(1).
+  db.ref("/history")
+    .orderByChild("ts")
+    .limitToLast(1)
+    .on("child_added", snap => {
+      const d = snap.val();  // { ts, phaseA:{current,voltage}, phaseB:..., phaseC:... }
+      // Встановлюємо покази
+      currentEls.currentA .innerText = d.phaseA.current .toFixed(1);
+      currentEls.voltageA .innerText = d.phaseA.voltage .toFixed(1);
+      currentEls.currentB .innerText = d.phaseB.current .toFixed(1);
+      currentEls.voltageB .innerText = d.phaseB.voltage .toFixed(1);
+      currentEls.currentC .innerText = d.phaseC.current .toFixed(1);
+      currentEls.voltageC .innerText = d.phaseC.voltage .toFixed(1);
+      updatePower();
+
+      // Оновлюємо час найближчого оновлення
+      lastUpdatedEl.innerText = "Останнє оновлення: " 
+        + new Date(d.ts * 1000).toLocaleString("uk-UA");
+    });
+}
+
     function updatePower(){
       const ia=parseFloat(currentEls.currentA.innerText)||0,
             ib=parseFloat(currentEls.currentB.innerText)||0,
