@@ -80,7 +80,7 @@
   </footer>
 
   <script>
-    // Автоматично вставимо рік
+    // Вставка поточного року у футер
     document.getElementById("curDate").innerText = new Date().getFullYear();
 
     // Ініціалізація Firebase
@@ -91,7 +91,6 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Елементи сторінки
     const statusEl = document.getElementById("status");
     const lastUpdatedEl = document.getElementById("lastUpdated");
     const currentEls = {
@@ -110,103 +109,160 @@
        "iMax24h","iMin24h","iAvg24h","vMax24h","vMin24h","vAvg24h"]
       .map(id=>document.getElementById(id));
 
-    // Графіки
     const ctxI = document.getElementById("currentChart").getContext("2d");
     const ctxV = document.getElementById("voltageChart").getContext("2d");
     let chartI, chartV;
-    let currentRange = parseInt(localStorage.getItem("rangeHours"))||1;
+    let currentRange = parseInt(localStorage.getItem("rangeHours")) || 1;
 
-    // Функції ---------------------------------------------------
     function setValuesDots(){
       Object.values(currentEls).forEach(el=>el.innerText="...");
-      lastUpdatedEl.innerText="Останнє оновлення: —";
+      lastUpdatedEl.innerText = "Останнє оновлення: —";
     }
+
+    // Виправлена функція для одноразового зчитування поточних значень
     function updateLiveData(){
-      ["phaseA","phaseB","phaseC"].forEach((phase,i)=>{
+      ["phaseA","phaseB","phaseC"].forEach((phase)=>{
         ["current","voltage"].forEach(type=>{
-          db.ref(`/${phase}/${type}`).on("value",snap=>{
-            const v=snap.val();
-            currentEls[`${type}${phase.charAt(5)}`].innerText=v?.toFixed(1)||"...";
-            updatePower(); lastUpdatedEl.innerText="Останнє оновлення: "+new Date().toLocaleString("uk-UA");
+          db.ref(`/${phase}/${type}`).once("value").then(snap=>{
+            const v = snap.val();
+            currentEls[`${type}${phase.charAt(5)}`].innerText = (v !== null) ? v.toFixed(1) : "...";
+            updatePower();
           });
         });
       });
-    }
-    function updatePower(){
-      const ia=parseFloat(currentEls.currentA.innerText)||0,
-            ib=parseFloat(currentEls.currentB.innerText)||0,
-            ic=parseFloat(currentEls.currentC.innerText)||0,
-            va=parseFloat(currentEls.voltageA.innerText)||0,
-            vb=parseFloat(currentEls.voltageB.innerText)||0,
-            vc=parseFloat(currentEls.voltageC.innerText)||0;
-      currentEls.power.innerText=(ia*va+ib*vb+ic*vc).toFixed(0);
-    }
-    function checkStatus(){
-      statusEl.innerText="Перевірка підключення...";statusEl.style.color="orange";setValuesDots();
-      const now=Math.floor(Date.now()/1000);
-      Promise.all([db.ref("/status/lastSeen").get(),db.ref("/status/online").get()])
-      .then(([s,ol])=>{
-        const ls=s.val(), on=ol.val();
-        if(ls&&now-ls<=90||on===true){
-          statusEl.innerText="Підключено"; statusEl.style.color="lime"; updateLiveData();
-        } else {
-          statusEl.innerText="ESP32 офлайн"; statusEl.style.color="red"; setValuesDots();
-        }
-      }).catch(e=>{
-        statusEl.innerText="Помилка з'єднання"; statusEl.style.color="red"; setValuesDots();
-      });
-    }
-    function setRange(h){
-      localStorage.setItem("rangeHours",h); currentRange=h; loadChartData(h);
-    }
-    function reloadCharts(){ loadChartData(currentRange); }
-    function loadChartData(hours){
-      const since= Math.floor(Date.now()/1000)-hours*3600;
-      db.ref("/history").orderByChild("ts").startAt(since).once("value",snap=>{
-        const data=[]; snap.forEach(c=>data.push(c.val()));
-        if(!data.length) return;
-        dataCountEl.innerText=data.length;
-        // часові мітки
-        const labels=data.map(d=>new Date(d.ts*1000).toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-digit"}));
-        // масиви
-        const iA=data.map(d=>d.phaseA.current),
-              iB=data.map(d=>d.phaseB.current),
-              iC=data.map(d=>d.phaseC.current),
-              vA=data.map(d=>d.phaseA.voltage),
-              vB=data.map(d=>d.phaseB.voltage),
-              vC=data.map(d=>d.phaseC.voltage);
-        // stats
-        calcStats(data,3600,[iMax1h,iMin1h,iAvg1h],[vMax1h,vMin1h,vAvg1h]);
-        calcStats(data,86400,[iMax24h,iMin24h,iAvg24h],[vMax24h,vMin24h,vAvg24h]);
-        // побудова графіків
-        if(chartI) chartI.destroy();
-        chartI=new Chart(ctxI,{type:"line",data:{labels,datasets:[
-          {label:"A (A)",data:iA,borderColor:"cyan",tension:0.3},
-          {label:"B (A)",data:iB,borderColor:"orange",tension:0.3},
-          {label:"C (A)",data:iC,borderColor:"lime",tension:0.3}
-        ]},options:{responsive:true,scales:{x:{ticks:{color:"#999"}},y:{ticks:{color:"#999"}}},plugins:{legend:{labels:{color:"#ccc"}}}}});
-        if(chartV) chartV.destroy();
-        chartV=new Chart(ctxV,{type:"line",data:{labels,datasets:[
-          {label:"A (V)",data:vA,borderColor:"#00bcd4",tension:0.3},
-          {label:"B (V)",data:vB,borderColor:"#ff9800",tension:0.3},
-          {label:"C (V)",data:vC,borderColor:"#8bc34a",tension:0.3}
-        ]},options:{responsive:true,scales:{x:{ticks:{color:"#999"}},y:{ticks:{color:"#999"}}},plugins:{legend:{labels:{color:"#ccc"}}}}});
-      });
-    }
-    function calcStats(raw,period,elemsI,elemsV){
-      const now=Math.floor(Date.now()/1000),from=now-period;
-      const arrI=raw.filter(d=>d.ts>=from).map(d=>d.phaseA.current).concat(raw.filter(d=>d.ts>=from).map(d=>d.phaseB.current),raw.filter(d=>d.ts>=from).map(d=>d.phaseC.current));
-      const arrV=raw.filter(d=>d.ts>=from).map(d=>d.phaseA.voltage).concat(raw.filter(d=>d.ts>=from).map(d=>d.phaseB.voltage),raw.filter(d=>d.ts>=from).map(d=>d.phaseC.voltage));
-      const stat=(arr)=>arr.length?{min:Math.min(...arr).toFixed(1),max:Math.max(...arr).toFixed(1),avg:(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1)}:{min:"-",max:"-",avg:"-"};
-      const sI=stat(arrI), sV=stat(arrV);
-      elemsI[0].innerText=sI.max; elemsI[1].innerText=sI.min; elemsI[2].innerText=sI.avg;
-      elemsV[0].innerText=sV.max; elemsV[1].innerText=sV.min; elemsV[2].innerText=sV.avg;
+      lastUpdatedEl.innerText = "Останнє оновлення: "+new Date().toLocaleString("uk-UA");
     }
 
-    // Старт
+    function updatePower(){
+      const ia = parseFloat(currentEls.currentA.innerText) || 0,
+            ib = parseFloat(currentEls.currentB.innerText) || 0,
+            ic = parseFloat(currentEls.currentC.innerText) || 0,
+            va = parseFloat(currentEls.voltageA.innerText) || 0,
+            vb = parseFloat(currentEls.voltageB.innerText) || 0,
+            vc = parseFloat(currentEls.voltageC.innerText) || 0;
+      currentEls.power.innerText = (ia*va + ib*vb + ic*vc).toFixed(0);
+    }
+
+    function checkStatus(){
+      statusEl.innerText = "Перевірка підключення...";
+      statusEl.style.color = "orange";
+      setValuesDots();
+      const now = Math.floor(Date.now()/1000);
+      Promise.all([db.ref("/status/lastSeen").get(), db.ref("/status/online").get()])
+      .then(([lastSeenSnap, onlineSnap])=>{
+        const lastSeen = lastSeenSnap.val();
+        const online = onlineSnap.val();
+        if((lastSeen && now - lastSeen <= 90) || online === true){
+          statusEl.innerText = "Підключено";
+          statusEl.style.color = "lime";
+          updateLiveData();  // Зчитуємо актуальні дані одразу
+        } else {
+          statusEl.innerText = "ESP32 офлайн";
+          statusEl.style.color = "red";
+          setValuesDots();
+        }
+      }).catch(()=>{
+        statusEl.innerText = "Помилка з'єднання";
+        statusEl.style.color = "red";
+        setValuesDots();
+      });
+    }
+
+    function setRange(h){
+      localStorage.setItem("rangeHours", h);
+      currentRange = h;
+      loadChartData(h);
+    }
+    function reloadCharts(){
+      loadChartData(currentRange);
+    }
+
+    function loadChartData(hours){
+      const since = Math.floor(Date.now()/1000) - hours*3600;
+      db.ref("/history").orderByChild("ts").startAt(since).once("value").then(snap=>{
+        const data = [];
+        snap.forEach(c=>data.push(c.val()));
+        if(!data.length) return;
+        dataCountEl.innerText = data.length;
+
+        const labels = data.map(d=>new Date(d.ts*1000).toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-digit"}));
+
+        const iA = data.map(d=>d.phaseA.current),
+              iB = data.map(d=>d.phaseB.current),
+              iC = data.map(d=>d.phaseC.current),
+              vA = data.map(d=>d.phaseA.voltage),
+              vB = data.map(d=>d.phaseB.voltage),
+              vC = data.map(d=>d.phaseC.voltage);
+
+        calcStats(data,3600,[iMax1h,iMin1h,iAvg1h],[vMax1h,vMin1h,vAvg1h]);
+        calcStats(data,86400,[iMax24h,iMin24h,iAvg24h],[vMax24h,vMin24h,vAvg24h]);
+
+        if(chartI) chartI.destroy();
+        chartI = new Chart(ctxI, {
+          type: "line",
+          data: {
+            labels,
+            datasets:[
+              {label:"A (A)", data:iA, borderColor:"cyan", tension:0.3},
+              {label:"B (A)", data:iB, borderColor:"orange", tension:0.3},
+              {label:"C (A)", data:iC, borderColor:"lime", tension:0.3}
+            ]
+          },
+          options: {
+            responsive:true,
+            scales: { x:{ticks:{color:"#999"}}, y:{ticks:{color:"#999"}} },
+            plugins: { legend:{labels:{color:"#ccc"}} }
+          }
+        });
+
+        if(chartV) chartV.destroy();
+        chartV = new Chart(ctxV, {
+          type: "line",
+          data: {
+            labels,
+            datasets:[
+              {label:"A (V)", data:vA, borderColor:"#00bcd4", tension:0.3},
+              {label:"B (V)", data:vB, borderColor:"#ff9800", tension:0.3},
+              {label:"C (V)", data:vC, borderColor:"#8bc34a", tension:0.3}
+            ]
+          },
+          options: {
+            responsive:true,
+            scales: { x:{ticks:{color:"#999"}}, y:{ticks:{color:"#999"}} },
+            plugins: { legend:{labels:{color:"#ccc"}} }
+          }
+        });
+      });
+    }
+
+    function calcStats(raw,period,elemsI,elemsV){
+      const now = Math.floor(Date.now()/1000), from = now - period;
+      const filtered = raw.filter(d => d.ts >= from);
+      const arrI = [].concat(
+        filtered.map(d => d.phaseA.current),
+        filtered.map(d => d.phaseB.current),
+        filtered.map(d => d.phaseC.current)
+      );
+      const arrV = [].concat(
+        filtered.map(d => d.phaseA.voltage),
+        filtered.map(d => d.phaseB.voltage),
+        filtered.map(d => d.phaseC.voltage)
+      );
+      const stat = arr => arr.length ? {
+        min: Math.min(...arr).toFixed(1),
+        max: Math.max(...arr).toFixed(1),
+        avg: (arr.reduce((a,b) => a+b, 0) / arr.length).toFixed(1)
+      } : {min:"-", max:"-", avg:"-"};
+      const sI = stat(arrI);
+      const sV = stat(arrV);
+      elemsI[0].innerText = sI.max; elemsI[1].innerText = sI.min; elemsI[2].innerText = sI.avg;
+      elemsV[0].innerText = sV.max; elemsV[1].innerText = sV.min; elemsV[2].innerText = sV.avg;
+    }
+
+    // Стартова ініціалізація
     checkStatus();
     reloadCharts();
-    setInterval(reloadCharts,60000);
+    setInterval(reloadCharts, 60000);  // Оновлення графіків кожну хвилину
   </script>
 </body>
 </html>
