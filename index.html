@@ -177,39 +177,104 @@ function updateLiveData() {
       localStorage.setItem("rangeHours",h); currentRange=h; loadChartData(h);
     }
     function reloadCharts(){ loadChartData(currentRange); }
-    function loadChartData(hours){
-      const since= Math.floor(Date.now()/1000)-hours*3600;
-      db.ref("/history").orderByChild("ts").startAt(since).once("value",snap=>{
-        const data=[]; snap.forEach(c=>data.push(c.val()));
-        if(!data.length) return;
-        dataCountEl.innerText=data.length;
-        // часові мітки
-        const labels=data.map(d=>new Date(d.ts*1000).toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-digit"}));
-        // масиви
-        const iA=data.map(d=>d.phaseA.current),
-              iB=data.map(d=>d.phaseB.current),
-              iC=data.map(d=>d.phaseC.current),
-              vA=data.map(d=>d.phaseA.voltage),
-              vB=data.map(d=>d.phaseB.voltage),
-              vC=data.map(d=>d.phaseC.voltage);
-        // stats
-        calcStats(data,3600,[iMax1h,iMin1h,iAvg1h],[vMax1h,vMin1h,vAvg1h]);
-        calcStats(data,86400,[iMax24h,iMin24h,iAvg24h],[vMax24h,vMin24h,vAvg24h]);
-        // побудова графіків
-        if(chartI) chartI.destroy();
-        chartI=new Chart(ctxI,{type:"line",data:{labels,datasets:[
-          {label:"A (A)",data:iA,borderColor:"cyan",tension:0.3},
-          {label:"B (A)",data:iB,borderColor:"orange",tension:0.3},
-          {label:"C (A)",data:iC,borderColor:"lime",tension:0.3}
-        ]},options:{responsive:true,scales:{x:{ticks:{color:"#999"}},y:{ticks:{color:"#999"}}},plugins:{legend:{labels:{color:"#ccc"}}}}});
-        if(chartV) chartV.destroy();
-        chartV=new Chart(ctxV,{type:"line",data:{labels,datasets:[
-          {label:"A (V)",data:vA,borderColor:"#00bcd4",tension:0.3},
-          {label:"B (V)",data:vB,borderColor:"#ff9800",tension:0.3},
-          {label:"C (V)",data:vC,borderColor:"#8bc34a",tension:0.3}
-        ]},options:{responsive:true,scales:{x:{ticks:{color:"#999"}},y:{ticks:{color:"#999"}}},plugins:{legend:{labels:{color:"#ccc"}}}}});
+    /**
+ * Завантажує і малює дані з /history за останні `hours` годин
+ */
+function loadChartData(hours) {
+  const since = Math.floor(Date.now() / 1000) - hours * 3600;
+
+  // Запитуємо всі записи з ts >= since
+  db.ref("/history")
+    .orderByChild("ts")
+    .startAt(since)
+    .once("value")
+    .then(snap => {
+      const records = [];
+      snap.forEach(childSnap => {
+        const rec = childSnap.val(); 
+        // Для надійності перевіряємо, що структура правильна:
+        if (rec.phaseA && rec.phaseB && rec.phaseC && rec.ts) {
+          records.push(rec);
+        }
       });
-    }
+
+      // Якщо немає даних — чистимо графіки й виходимо
+      if (records.length === 0) {
+        dataCountEl.innerText = "0";
+        if (chartI) chartI.destroy();
+        if (chartV) chartV.destroy();
+        return;
+      }
+
+      // Відобразити кількість точок
+      dataCountEl.innerText = records.length;
+
+      // Підписи по часу
+      const labels = records.map(r =>
+        new Date(r.ts * 1000).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })
+      );
+
+      // Збираємо окремі масиви струму і напруги
+      const iA = records.map(r => r.phaseA.current);
+      const iB = records.map(r => r.phaseB.current);
+      const iC = records.map(r => r.phaseC.current);
+      const vA = records.map(r => r.phaseA.voltage);
+      const vB = records.map(r => r.phaseB.voltage);
+      const vC = records.map(r => r.phaseC.voltage);
+
+      // Оновлюємо статистику
+      calcStats(records, 3600, [iMax1h, iMin1h, iAvg1h], [vMax1h, vMin1h, vAvg1h]);
+      calcStats(records, 86400, [iMax24h, iMin24h, iAvg24h], [vMax24h, vMin24h, vAvg24h]);
+
+      // Малюємо графік струмів
+      if (chartI) chartI.destroy();
+      chartI = new Chart(ctxI, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            { label: "A (A)", data: iA, borderColor: "cyan", tension: 0.3 },
+            { label: "B (A)", data: iB, borderColor: "orange", tension: 0.3 },
+            { label: "C (A)", data: iC, borderColor: "lime", tension: 0.3 }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { labels: { color: "#ccc" } } },
+          scales: {
+            x: { ticks: { color: "#999" } },
+            y: { ticks: { color: "#999" } }
+          }
+        }
+      });
+
+      // Малюємо графік напруг
+      if (chartV) chartV.destroy();
+      chartV = new Chart(ctxV, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            { label: "A (V)", data: vA, borderColor: "#00bcd4", tension: 0.3 },
+            { label: "B (V)", data: vB, borderColor: "#ff9800", tension: 0.3 },
+            { label: "C (V)", data: vC, borderColor: "#8bc34a", tension: 0.3 }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { labels: { color: "#ccc" } } },
+          scales: {
+            x: { ticks: { color: "#999" } },
+            y: { ticks: { color: "#999" } }
+          }
+        }
+      });
+    })
+    .catch(err => {
+      console.error("Помилка завантаження історії:", err);
+    });
+}
+
     function calcStats(raw,period,elemsI,elemsV){
       const now=Math.floor(Date.now()/1000),from=now-period;
       const arrI=raw.filter(d=>d.ts>=from).map(d=>d.phaseA.current).concat(raw.filter(d=>d.ts>=from).map(d=>d.phaseB.current),raw.filter(d=>d.ts>=from).map(d=>d.phaseC.current));
@@ -222,6 +287,7 @@ function updateLiveData() {
 
     // Старт
     checkStatus();
+    //updateLiveData();
     reloadCharts();
     setInterval(reloadCharts,60000);
   </script>
