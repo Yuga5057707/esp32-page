@@ -185,21 +185,7 @@ function updateLiveData() {
 }
 
     
-    function checkStatus(){
-      statusEl.innerText="Перевірка підключення...";statusEl.style.color="orange";setValuesDots();
-      const now=Math.floor(Date.now()/1000);
-      Promise.all([db.ref("/status/lastSeen").get(),db.ref("/status/online").get()])
-      .then(([s,ol])=>{
-        const ls=s.val(), on=ol.val();
-        if(ls&&now-ls<=90||on===true){
-          statusEl.innerText="Підключено"; statusEl.style.color="lime"; updateLiveData();
-        } else {
-          statusEl.innerText="ESP32 офлайн"; statusEl.style.color="red"; setValuesDots();
-        }
-      }).catch(e=>{
-        statusEl.innerText="Помилка з'єднання"; statusEl.style.color="red"; setValuesDots();
-      });
-    }
+
     function setRange(h){
       localStorage.setItem("rangeHours",h); currentRange=h; loadChartData(h);
     }
@@ -314,7 +300,7 @@ function loadChartData(hours) {
 
     // Старт
     checkStatus();
-    //updateLiveData();
+    updateLiveData();
     reloadCharts();
     setInterval(reloadCharts,60000);
     setInterval(monitorOfflineByTs, 30000);  // ⏱️
