@@ -113,18 +113,13 @@
       ["iMax1h","iMin1h","iAvg1h","vMax1h","vMin1h","vAvg1h",
        "iMax24h","iMin24h","iAvg24h","vMax24h","vMin24h","vAvg24h"]
       .map(id=>document.getElementById(id));
-    
-    
-    let lastDataTs = 0;
+
     // Графіки
     const ctxI = document.getElementById("currentChart").getContext("2d");
     const ctxV = document.getElementById("voltageChart").getContext("2d");
     let chartI, chartV;
     let currentRange = parseInt(localStorage.getItem("rangeHours"))||1;
-    
 
-
-    
     // Функції ---------------------------------------------------
     function setValuesDots(){
       Object.values(currentEls).forEach(el=>el.innerText="...");
@@ -136,12 +131,14 @@
  * і оновлюємо поточні покази.
  */
 function updateLiveData() {
+  // Потрібно підписатися once на limitToLast(1), але щоб працювало live —
+  // використаємо on('child_added') на запиті з limitToLast(1).
   db.ref("/history")
     .orderByChild("ts")
     .limitToLast(1)
     .on("child_added", snap => {
-      const d = snap.val();
-
+      const d = snap.val();  // { ts, phaseA:{current,voltage}, phaseB:..., phaseC:... }
+      // Встановлюємо покази
       currentEls.currentA .innerText = d.phaseA.current .toFixed(1);
       currentEls.voltageA .innerText = d.phaseA.voltage .toFixed(1);
       currentEls.currentB .innerText = d.phaseB.current .toFixed(1);
@@ -150,15 +147,11 @@ function updateLiveData() {
       currentEls.voltageC .innerText = d.phaseC.voltage .toFixed(1);
       updatePower();
 
-      lastDataTs = d.ts; // 🆕 зберігаємо час останнього запису
-      monitorOfflineByTs(); // 🆕 оновлюємо статус одразу
-
+      // Оновлюємо час найближчого оновлення
       lastUpdatedEl.innerText = "Останнє оновлення: " 
         + new Date(d.ts * 1000).toLocaleString("uk-UA");
     });
 }
-
-    
 
     function updatePower(){
       const ia=parseFloat(currentEls.currentA.innerText)||0,
@@ -169,23 +162,21 @@ function updateLiveData() {
             vc=parseFloat(currentEls.voltageC.innerText)||0;
       currentEls.power.innerText=(ia*va+ib*vb+ic*vc).toFixed(0);
     }
-
-    function monitorOfflineByTs() {
-  const now = Math.floor(Date.now() / 1000);
-  const diff = now - lastDataTs;
-
-  if (lastDataTs === 0 || diff > 60) {
-    statusEl.innerText = "ESP32 офлайн";
-    statusEl.style.color = "red";
-    setValuesDots();
-  } else {
-    statusEl.innerText = "Підключено";
-    statusEl.style.color = "lime";
-  }
-}
-
-    
-
+    function checkStatus(){
+      statusEl.innerText="Перевірка підключення...";statusEl.style.color="orange";setValuesDots();
+      const now=Math.floor(Date.now()/1000);
+      Promise.all([db.ref("/status/lastSeen").get(),db.ref("/status/online").get()])
+      .then(([s,ol])=>{
+        const ls=s.val(), on=ol.val();
+        if(ls&&now-ls<=90||on===true){
+          statusEl.innerText="Підключено"; statusEl.style.color="lime"; updateLiveData();
+        } else {
+          statusEl.innerText="ESP32 офлайн"; statusEl.style.color="red"; setValuesDots();
+        }
+      }).catch(e=>{
+        statusEl.innerText="Помилка з'єднання"; statusEl.style.color="red"; setValuesDots();
+      });
+    }
     function setRange(h){
       localStorage.setItem("rangeHours",h); currentRange=h; loadChartData(h);
     }
@@ -300,11 +291,9 @@ function loadChartData(hours) {
 
     // Старт
     checkStatus();
-    updateLiveData();
+    //updateLiveData();
     reloadCharts();
     setInterval(reloadCharts,60000);
-    setInterval(monitorOfflineByTs, 61000);  // ⏱️
-
   </script>
 </body>
 </html>
