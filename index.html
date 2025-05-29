@@ -1,19 +1,308 @@
 <!DOCTYPE html>
+
 <html lang="uk">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>ДАЧА 3-Фазний Монітор</title>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ДАЧА 3-Фазний Монітор</title>
+<link href="favicon.png" rel="icon" type="image/png"/>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js">
+    function loadCustomRange() {
+      const start = document.getElementById("startTime").value;
+      const end = document.getElementById("endTime").value;
+      if (!start || !end) {
+        alert("Виберіть початок і кінець діапазону!");
+        return;
+      }
+      const startTs = Math.floor(new Date(start).getTime() / 1000);
+      const endTs = Math.floor(new Date(end).getTime() / 1000);
+      if (startTs >= endTs) {
+        alert("Початковий час має бути раніше за кінцевий!");
+        return;
+      }
+      loadChartDataCustom(startTs, endTs);
+    }
 
-  <link rel="icon" type="image/png" href="favicon.png">
-  
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    function loadChartDataCustom(startTs, endTs) {
+      db.ref("/history")
+        .orderByChild("ts")
+        .startAt(startTs)
+        .endAt(endTs)
+        .once("value")
+        .then(snap => {
+          const records = [];
+          snap.forEach(childSnap => {
+            const rec = childSnap.val(); 
+            if (rec.phaseA && rec.phaseB && rec.phaseC && rec.ts) {
+              records.push(rec);
+            }
+          });
 
-  <style>
+          if (records.length === 0) {
+            dataCountEl.innerText = "0";
+            if (chartI) chartI.destroy();
+            if (chartV) chartV.destroy();
+            return;
+          }
+
+          dataCountEl.innerText = records.length;
+          const labels = records.map(r =>
+            new Date(r.ts * 1000).toLocaleString("uk-UA", { hour: "2-digit", minute: "2-digit" })
+          );
+          const iA = records.map(r => r.phaseA.current);
+          const iB = records.map(r => r.phaseB.current);
+          const iC = records.map(r => r.phaseC.current);
+          const vA = records.map(r => r.phaseA.voltage);
+          const vB = records.map(r => r.phaseB.voltage);
+          const vC = records.map(r => r.phaseC.voltage);
+
+          if (chartI) chartI.destroy();
+          chartI = new Chart(ctxI, {
+            type: "line",
+            data: {
+              labels,
+              datasets: [
+                { label: "A (A)", data: iA, borderColor: "cyan", tension: 0.3 },
+                { label: "B (A)", data: iB, borderColor: "orange", tension: 0.3 },
+                { label: "C (A)", data: iC, borderColor: "lime", tension: 0.3 }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { labels: { color: "#ccc" } } },
+              scales: {
+                x: { ticks: { color: "#999" } },
+                y: { ticks: { color: "#999" } }
+              }
+            }
+          });
+
+          if (chartV) chartV.destroy();
+          chartV = new Chart(ctxV, {
+            type: "line",
+            data: {
+              labels,
+              datasets: [
+                { label: "A (V)", data: vA, borderColor: "#00bcd4", tension: 0.3 },
+                { label: "B (V)", data: vB, borderColor: "#ff9800", tension: 0.3 },
+                { label: "C (V)", data: vC, borderColor: "#8bc34a", tension: 0.3 }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { labels: { color: "#ccc" } } },
+              scales: {
+                x: { ticks: { color: "#999" } },
+                y: { ticks: { color: "#999" } }
+              }
+            }
+          });
+        })
+        .catch(err => {
+          console.error("Помилка завантаження історії:", err);
+        });
+    }
+
+</script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js">
+    function loadCustomRange() {
+      const start = document.getElementById("startTime").value;
+      const end = document.getElementById("endTime").value;
+      if (!start || !end) {
+        alert("Виберіть початок і кінець діапазону!");
+        return;
+      }
+      const startTs = Math.floor(new Date(start).getTime() / 1000);
+      const endTs = Math.floor(new Date(end).getTime() / 1000);
+      if (startTs >= endTs) {
+        alert("Початковий час має бути раніше за кінцевий!");
+        return;
+      }
+      loadChartDataCustom(startTs, endTs);
+    }
+
+    function loadChartDataCustom(startTs, endTs) {
+      db.ref("/history")
+        .orderByChild("ts")
+        .startAt(startTs)
+        .endAt(endTs)
+        .once("value")
+        .then(snap => {
+          const records = [];
+          snap.forEach(childSnap => {
+            const rec = childSnap.val(); 
+            if (rec.phaseA && rec.phaseB && rec.phaseC && rec.ts) {
+              records.push(rec);
+            }
+          });
+
+          if (records.length === 0) {
+            dataCountEl.innerText = "0";
+            if (chartI) chartI.destroy();
+            if (chartV) chartV.destroy();
+            return;
+          }
+
+          dataCountEl.innerText = records.length;
+          const labels = records.map(r =>
+            new Date(r.ts * 1000).toLocaleString("uk-UA", { hour: "2-digit", minute: "2-digit" })
+          );
+          const iA = records.map(r => r.phaseA.current);
+          const iB = records.map(r => r.phaseB.current);
+          const iC = records.map(r => r.phaseC.current);
+          const vA = records.map(r => r.phaseA.voltage);
+          const vB = records.map(r => r.phaseB.voltage);
+          const vC = records.map(r => r.phaseC.voltage);
+
+          if (chartI) chartI.destroy();
+          chartI = new Chart(ctxI, {
+            type: "line",
+            data: {
+              labels,
+              datasets: [
+                { label: "A (A)", data: iA, borderColor: "cyan", tension: 0.3 },
+                { label: "B (A)", data: iB, borderColor: "orange", tension: 0.3 },
+                { label: "C (A)", data: iC, borderColor: "lime", tension: 0.3 }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { labels: { color: "#ccc" } } },
+              scales: {
+                x: { ticks: { color: "#999" } },
+                y: { ticks: { color: "#999" } }
+              }
+            }
+          });
+
+          if (chartV) chartV.destroy();
+          chartV = new Chart(ctxV, {
+            type: "line",
+            data: {
+              labels,
+              datasets: [
+                { label: "A (V)", data: vA, borderColor: "#00bcd4", tension: 0.3 },
+                { label: "B (V)", data: vB, borderColor: "#ff9800", tension: 0.3 },
+                { label: "C (V)", data: vC, borderColor: "#8bc34a", tension: 0.3 }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { labels: { color: "#ccc" } } },
+              scales: {
+                x: { ticks: { color: "#999" } },
+                y: { ticks: { color: "#999" } }
+              }
+            }
+          });
+        })
+        .catch(err => {
+          console.error("Помилка завантаження історії:", err);
+        });
+    }
+
+</script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js">
+    function loadCustomRange() {
+      const start = document.getElementById("startTime").value;
+      const end = document.getElementById("endTime").value;
+      if (!start || !end) {
+        alert("Виберіть початок і кінець діапазону!");
+        return;
+      }
+      const startTs = Math.floor(new Date(start).getTime() / 1000);
+      const endTs = Math.floor(new Date(end).getTime() / 1000);
+      if (startTs >= endTs) {
+        alert("Початковий час має бути раніше за кінцевий!");
+        return;
+      }
+      loadChartDataCustom(startTs, endTs);
+    }
+
+    function loadChartDataCustom(startTs, endTs) {
+      db.ref("/history")
+        .orderByChild("ts")
+        .startAt(startTs)
+        .endAt(endTs)
+        .once("value")
+        .then(snap => {
+          const records = [];
+          snap.forEach(childSnap => {
+            const rec = childSnap.val(); 
+            if (rec.phaseA && rec.phaseB && rec.phaseC && rec.ts) {
+              records.push(rec);
+            }
+          });
+
+          if (records.length === 0) {
+            dataCountEl.innerText = "0";
+            if (chartI) chartI.destroy();
+            if (chartV) chartV.destroy();
+            return;
+          }
+
+          dataCountEl.innerText = records.length;
+          const labels = records.map(r =>
+            new Date(r.ts * 1000).toLocaleString("uk-UA", { hour: "2-digit", minute: "2-digit" })
+          );
+          const iA = records.map(r => r.phaseA.current);
+          const iB = records.map(r => r.phaseB.current);
+          const iC = records.map(r => r.phaseC.current);
+          const vA = records.map(r => r.phaseA.voltage);
+          const vB = records.map(r => r.phaseB.voltage);
+          const vC = records.map(r => r.phaseC.voltage);
+
+          if (chartI) chartI.destroy();
+          chartI = new Chart(ctxI, {
+            type: "line",
+            data: {
+              labels,
+              datasets: [
+                { label: "A (A)", data: iA, borderColor: "cyan", tension: 0.3 },
+                { label: "B (A)", data: iB, borderColor: "orange", tension: 0.3 },
+                { label: "C (A)", data: iC, borderColor: "lime", tension: 0.3 }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { labels: { color: "#ccc" } } },
+              scales: {
+                x: { ticks: { color: "#999" } },
+                y: { ticks: { color: "#999" } }
+              }
+            }
+          });
+
+          if (chartV) chartV.destroy();
+          chartV = new Chart(ctxV, {
+            type: "line",
+            data: {
+              labels,
+              datasets: [
+                { label: "A (V)", data: vA, borderColor: "#00bcd4", tension: 0.3 },
+                { label: "B (V)", data: vB, borderColor: "#ff9800", tension: 0.3 },
+                { label: "C (V)", data: vC, borderColor: "#8bc34a", tension: 0.3 }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { labels: { color: "#ccc" } } },
+              scales: {
+                x: { ticks: { color: "#999" } },
+                y: { ticks: { color: "#999" } }
+              }
+            }
+          });
+        })
+        .catch(err => {
+          console.error("Помилка завантаження історії:", err);
+        });
+    }
+
+</script>
+<style>
     body { background: #121212; color: #e0e0e0; font-family: Arial; margin:0; padding:20px; }
     h1 { text-align:center; margin-bottom:10px; }
     #status { font-weight:bold; text-align:center; margin-bottom:5px; }
@@ -29,60 +318,61 @@
   </style>
 </head>
 <body>
-  <h1>ДАЧА 3-Фазний Монітор</h1>
-  <div id="status">Перевірка підключення...</div>
-  <div id="lastUpdated">Останнє оновлення: —</div>
-
-  <div id="liveValues">
-    <div class="phase-box">
-      <h3>Фаза A</h3>
+<h1>ДАЧА 3-Фазний Монітор</h1>
+<div id="status">Перевірка підключення...</div>
+<div id="lastUpdated">Останнє оновлення: —</div>
+<div id="liveValues">
+<div class="phase-box">
+<h3>Фаза A</h3>
       Струм: <span id="currentA">...</span> A<br/>
       Напруга: <span id="voltageA">...</span> V
     </div>
-    <div class="phase-box">
-      <h3>Фаза B</h3>
+<div class="phase-box">
+<h3>Фаза B</h3>
       Струм: <span id="currentB">...</span> A<br/>
       Напруга: <span id="voltageB">...</span> V
     </div>
-    <div class="phase-box">
-      <h3>Фаза C</h3>
+<div class="phase-box">
+<h3>Фаза C</h3>
       Струм: <span id="currentC">...</span> A<br/>
       Напруга: <span id="voltageC">...</span> V
     </div>
-    <div class="phase-box">
-      <h3>Потужність</h3>
+<div class="phase-box">
+<h3>Потужність</h3>
       Сумарна: <span id="power">...</span> Вт
     </div>
-  </div>
-
-  <div class="minmax-box">
-    <b>Поточний діапазон:</b> <span id="dataCount">-</span> точок<br/><br/>
-    <b>За 1 годину:</b><br/>
+</div>
+<div class="minmax-box">
+<b>Поточний діапазон:</b> <span id="dataCount">-</span> точок<br/><br/>
+<b>За 1 годину:</b><br/>
       Струм: Макс <span id="iMax1h">-</span> / Мін <span id="iMin1h">-</span> / Середнє <span id="iAvg1h">-</span> A<br/>
       Напруга: Макс <span id="vMax1h">-</span> / Мін <span id="vMin1h">-</span> / Середнє <span id="vAvg1h">-</span> V<br/><br/>
-    <b>За добу:</b><br/>
+<b>За добу:</b><br/>
       Струм: Макс <span id="iMax24h">-</span> / Мін <span id="iMin24h">-</span> / Середнє <span id="iAvg24h">-</span> A<br/>
       Напруга: Макс <span id="vMax24h">-</span> / Мін <span id="vMin24h">-</span> / Середнє <span id="vAvg24h">-</span> V
   </div>
-
-  <div id="controls">
-    <button class="range-btn" onclick="setRange(1)">1 година</button>
-    <button class="range-btn" onclick="setRange(2)">2 години</button>
-    <button class="range-btn" onclick="setRange(6)">6 годин</button>
-    <button class="range-btn" onclick="setRange(12)">12 годин</button>
-    <button class="range-btn" onclick="setRange(24)">24 години</button>
-    <button class="range-btn" onclick="reloadCharts()">Оновити графік</button>
-  </div>
-
-  <canvas id="currentChart"></canvas>
-  <canvas id="voltageChart"></canvas>
-
-  <footer>
+<div id="controls">
+<div style="margin-top:15px; color:#ccc;">
+<label for="startTime">Початок (YYYY-MM-DD HH:MM): </label>
+<input id="startTime" style="margin-right:10px;" type="datetime-local"/>
+<label for="endTime">Кінець (YYYY-MM-DD HH:MM): </label>
+<input id="endTime" style="margin-right:10px;" type="datetime-local"/>
+<button class="range-btn" onclick="loadCustomRange()">Показати</button>
+</div>
+<button class="range-btn" onclick="setRange(1)">1 година</button>
+<button class="range-btn" onclick="setRange(2)">2 години</button>
+<button class="range-btn" onclick="setRange(6)">6 годин</button>
+<button class="range-btn" onclick="setRange(12)">12 годин</button>
+<button class="range-btn" onclick="setRange(24)">24 години</button>
+<button class="range-btn" onclick="reloadCharts()">Оновити графік</button>
+</div>
+<canvas id="currentChart"></canvas>
+<canvas id="voltageChart"></canvas>
+<footer>
     © <span id="curDate"></span> Розроблено та впроваджено електротехнічною службою А3211
      <p>Технічна підтримка ДИДИРКО Юрій 0957002846 </p>
-  </footer>
-
-  <script>
+</footer>
+<script>
     
     // Автоматично вставимо рік
     document.getElementById("curDate").innerText = new Date().getFullYear();
@@ -294,6 +584,103 @@ function loadChartData(hours) {
     //updateLiveData();
     reloadCharts();
     setInterval(reloadCharts,60000);
-  </script>
+  
+    function loadCustomRange() {
+      const start = document.getElementById("startTime").value;
+      const end = document.getElementById("endTime").value;
+      if (!start || !end) {
+        alert("Виберіть початок і кінець діапазону!");
+        return;
+      }
+      const startTs = Math.floor(new Date(start).getTime() / 1000);
+      const endTs = Math.floor(new Date(end).getTime() / 1000);
+      if (startTs >= endTs) {
+        alert("Початковий час має бути раніше за кінцевий!");
+        return;
+      }
+      loadChartDataCustom(startTs, endTs);
+    }
+
+    function loadChartDataCustom(startTs, endTs) {
+      db.ref("/history")
+        .orderByChild("ts")
+        .startAt(startTs)
+        .endAt(endTs)
+        .once("value")
+        .then(snap => {
+          const records = [];
+          snap.forEach(childSnap => {
+            const rec = childSnap.val(); 
+            if (rec.phaseA && rec.phaseB && rec.phaseC && rec.ts) {
+              records.push(rec);
+            }
+          });
+
+          if (records.length === 0) {
+            dataCountEl.innerText = "0";
+            if (chartI) chartI.destroy();
+            if (chartV) chartV.destroy();
+            return;
+          }
+
+          dataCountEl.innerText = records.length;
+          const labels = records.map(r =>
+            new Date(r.ts * 1000).toLocaleString("uk-UA", { hour: "2-digit", minute: "2-digit" })
+          );
+          const iA = records.map(r => r.phaseA.current);
+          const iB = records.map(r => r.phaseB.current);
+          const iC = records.map(r => r.phaseC.current);
+          const vA = records.map(r => r.phaseA.voltage);
+          const vB = records.map(r => r.phaseB.voltage);
+          const vC = records.map(r => r.phaseC.voltage);
+
+          if (chartI) chartI.destroy();
+          chartI = new Chart(ctxI, {
+            type: "line",
+            data: {
+              labels,
+              datasets: [
+                { label: "A (A)", data: iA, borderColor: "cyan", tension: 0.3 },
+                { label: "B (A)", data: iB, borderColor: "orange", tension: 0.3 },
+                { label: "C (A)", data: iC, borderColor: "lime", tension: 0.3 }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { labels: { color: "#ccc" } } },
+              scales: {
+                x: { ticks: { color: "#999" } },
+                y: { ticks: { color: "#999" } }
+              }
+            }
+          });
+
+          if (chartV) chartV.destroy();
+          chartV = new Chart(ctxV, {
+            type: "line",
+            data: {
+              labels,
+              datasets: [
+                { label: "A (V)", data: vA, borderColor: "#00bcd4", tension: 0.3 },
+                { label: "B (V)", data: vB, borderColor: "#ff9800", tension: 0.3 },
+                { label: "C (V)", data: vC, borderColor: "#8bc34a", tension: 0.3 }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { labels: { color: "#ccc" } } },
+              scales: {
+                x: { ticks: { color: "#999" } },
+                y: { ticks: { color: "#999" } }
+              }
+            }
+          });
+        })
+        .catch(err => {
+          console.error("Помилка завантаження історії:", err);
+        });
+    }
+
+</script>
 </body>
 </html>
